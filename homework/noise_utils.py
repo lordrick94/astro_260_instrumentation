@@ -8,11 +8,14 @@ def num_emitted_photons(rate, t_exp):
 
 # Getting Sky background noise
 def sky_noise(sky_count_rate, t_exp, psf_fwhm):
-
     # Calculate the image area in arcsec^2
     Image_area = psf_fwhm**2 * np.pi/4
 
     return sky_count_rate * Image_area * t_exp
+
+
+def get_dark_current(dark_current_rate, num_pixels, t_exp):
+    return dark_current_rate.to(1/u.s) * num_pixels * t_exp
 
 # Getting read noise
 def get_read_noise(read_noise, num_pixels):
@@ -26,6 +29,7 @@ def get_pix_num(focal_plane_scale, psf_fwhm, pixel_size):
 def signal_to_noise(source_count_rate, 
                     sky_count_rate, 
                     read_noise,
+                    dark_current_rate,
                      t_exp, 
                      num_pixels, 
                      psf_fwhm,
@@ -39,25 +43,30 @@ def signal_to_noise(source_count_rate,
 
     sky_noise_rate = sky_noise(sky_count_rate, t_exp, psf_fwhm)
 
+    dark_current_noise = get_dark_current(dark_current_rate, num_pixels, t_exp)
+
     read_noise_rate = get_read_noise(read_noise, num_pixels)
 
     # Calculate the total noise
-    total_noise = np.sqrt(total_signal + sky_noise_rate + read_noise_rate)
+    total_noise = np.sqrt(total_signal + sky_noise_rate + read_noise_rate + dark_current_noise)
 
     snr = total_signal / total_noise
 
     fractional_poisson_noise = poisson_noise / total_noise
     fractional_sky_noise = np.sqrt(sky_noise_rate) / total_noise
+    fractiona_dark_current = np.sqrt(dark_current_noise) / total_noise
     fractional_read_noise = np.sqrt(read_noise_rate) / total_noise
 
     snr_dict = {
         'total_signal': total_signal,
         'poisson_noise': poisson_noise,
         'sky_noise_rate': sky_noise_rate,
+        'dark_current': dark_current_noise,
         'read_noise_rate': read_noise_rate,
         'total_noise': total_noise,
         'fractional_poisson_noise': fractional_poisson_noise,
         'fractional_sky_noise': fractional_sky_noise,
+        'fractional_dark_current': fractiona_dark_current,
         'fractional_read_noise': fractional_read_noise,
         'snr': np.sqrt(num_coadds)*snr
     }
@@ -68,6 +77,7 @@ def signal_to_noise(source_count_rate,
 
 def plot_noise_rates_vs_t_exps(t_exps,
                                fractional_sky_noise_l,
+                               fractional_dark_current_noise_l,
                                fractional_poisson_noise_l,
                                fractional_read_noise_l,
                                logy_scale=False,
@@ -81,6 +91,7 @@ def plot_noise_rates_vs_t_exps(t_exps,
     ax.scatter(t_exps, fractional_sky_noise_l, label='Sky Noise Rate', color='blue', s=ssize, marker='o')
     ax.scatter(t_exps, fractional_poisson_noise_l, label='Poisson Noise Rate', color='green',s=ssize, marker='o')
     ax.scatter(t_exps, fractional_read_noise_l, label='Read Noise Rate', color='red', s=ssize, marker='o')
+    ax.scatter(t_exps, fractional_dark_current_noise_l, label='Dark Current Noise Rate', color='orange', s=ssize, marker='o')
 
     # Add titles and labels
     ax.set_title('Noise Rates vs Exposure Time', fontsize=16)
@@ -105,6 +116,7 @@ def plot_noise_rates_vs_t_exps(t_exps,
 
 def plot_noise_rates_vs_photon_rate(source_count_rate_l,
                                     fractional_sky_noise_l,
+                                    fractional_dark_current_noise_l,
                                     fractional_poisson_noise_l,
                                     fractional_read_noise_l,
                                     ssize=5,
@@ -116,6 +128,7 @@ def plot_noise_rates_vs_photon_rate(source_count_rate_l,
     plt.scatter(source_count_rate_l, fractional_sky_noise_l, label='Sky Noise Rate Fraction', color='blue',s=ssize, marker='o')
     plt.scatter(source_count_rate_l, fractional_poisson_noise_l, label='Poisson Noise Rate Fraction', color='green',s=ssize, marker='o')
     plt.scatter(source_count_rate_l, fractional_read_noise_l, label='Read Noise Rate Fraction', color='red', s=ssize, marker='o')
+    plt.scatter(source_count_rate_l, fractional_dark_current_noise_l, label='Dark Current Noise Rate Fraction', color='orange', s=ssize, marker='o')
 
 
     # Add titles and labels
@@ -163,8 +176,7 @@ def plot_snr_vs_t_exps(t_exps, snr_l,ssize=5,lbl:str='SNR',ax=None,ax_color='cya
 
     return ax
 
-
-def noise_simualations(params, 
+def noise_simulations(params, 
                        t_exps=None,
                        source_count_rate_l=None,
                        varying_qty:str='time',
@@ -176,31 +188,27 @@ def noise_simualations(params,
     read_noise_rate_l = []
     fractional_poisson_noise_l = []
     fractional_sky_noise_l = []
+    fractional_dark_current_noise_l = []
     fractional_read_noise_l = []
 
     if varying_qty == 'time':
-        for t_exp in t_exps:
-            snr = signal_to_noise(**params, t_exp=t_exp, num_coadds=num_coadds)
-            snr_l.append(snr['snr'])
-            sky_noise_rate_l.append(snr['sky_noise_rate'])
-            total_signal_l.append(snr['total_signal'])
-            read_noise_rate_l.append(snr['read_noise_rate'])
-            fractional_poisson_noise_l.append(snr['fractional_poisson_noise'])
-            fractional_sky_noise_l.append(snr['fractional_sky_noise'])
-            fractional_read_noise_l.append(snr['fractional_read_noise'])
-
-
+        values = t_exps
+        key = 't_exp'
     elif varying_qty == 'source_rate':
-        for s in source_count_rate_l:
-            snr = signal_to_noise(**params, source_count_rate=s, num_coadds=num_coadds)
-            snr_l.append(snr['snr'])
-            sky_noise_rate_l.append(snr['sky_noise_rate'])
-            total_signal_l.append(snr['total_signal'])
-            read_noise_rate_l.append(snr['read_noise_rate'])
-            fractional_poisson_noise_l.append(snr['fractional_poisson_noise'])
-            fractional_sky_noise_l.append(snr['fractional_sky_noise'])
-            fractional_read_noise_l.append(snr['fractional_read_noise'])
+        values = source_count_rate_l
+        key = 'source_count_rate'
+    else:
+        raise ValueError("varying_qty must be either 'time' or 'source_rate'")
 
+    for value in values:
+        snr = signal_to_noise(**params, **{key: value}, num_coadds=num_coadds)
+        snr_l.append(snr['snr'])
+        sky_noise_rate_l.append(snr['sky_noise_rate'])
+        total_signal_l.append(snr['total_signal'])
+        read_noise_rate_l.append(snr['read_noise_rate'])
+        fractional_poisson_noise_l.append(snr['fractional_poisson_noise'])
+        fractional_sky_noise_l.append(snr['fractional_sky_noise'])
+        fractional_dark_current_noise_l.append(snr['fractional_dark_current'])
+        fractional_read_noise_l.append(snr['fractional_read_noise'])
 
-
-    return snr_l, sky_noise_rate_l, total_signal_l, read_noise_rate_l, fractional_poisson_noise_l, fractional_sky_noise_l, fractional_read_noise_l
+    return snr_l, sky_noise_rate_l, total_signal_l, read_noise_rate_l, fractional_poisson_noise_l, fractional_sky_noise_l, fractional_read_noise_l, fractional_dark_current_noise_l
