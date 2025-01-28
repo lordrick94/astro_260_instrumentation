@@ -146,7 +146,14 @@ def plot_noise_rates_vs_photon_rate(source_count_rate_l,
     plt.show()
 
 
-def plot_snr_vs_t_exps(t_exps, snr_l,ssize=5,lbl:str='SNR',ax=None,ax_color='cyan',set_logyscale:bool=False):
+def plot_snr_vs_t_exps(t_exps, 
+                       snr_l,
+                       ssize=5,
+                       lbl:str='SNR',
+                       ylbl:str='SNR',
+                       ax=None,
+                       ax_color='cyan',
+                       set_logyscale:bool=False):
 
     if ax is None:
         fig,ax = plt.subplots(figsize = (10,6))
@@ -158,9 +165,9 @@ def plot_snr_vs_t_exps(t_exps, snr_l,ssize=5,lbl:str='SNR',ax=None,ax_color='cya
     ax.scatter(t_exps, snr_l, label=lbl, color=ax_color, marker='o',s=ssize)
 
     # Add titles and labels
-    ax.set_title('Noise Rates vs Exposure Time', fontsize=16)
+    ax.set_title('SNR vs Exposure Time', fontsize=16)
     ax.set_xlabel('Exposure Time (s)', fontsize=14)
-    ax.set_ylabel('SNR', fontsize=14)
+    ax.set_ylabel(ylbl, fontsize=14)
 
     if set_logyscale:
         ax.set_yscale('log')

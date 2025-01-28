@@ -1,1 +1,6 @@
 notes/*
+
+# Python
+*.pyc
+*.pyo
+*__pycache__/
